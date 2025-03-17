@@ -203,9 +203,9 @@ def extract_from_pracuj() -> list:
                             url = job_url
                         ))
                 else:
-                    logger.error("Failed to retrieve job details from %s, status code: %s", job.a.get('href'), job_response.status_code)
+                    logger.error(f"Failed to retrieve more job details from {job_url}.")
             logger.debug(f"Successfully added a job. Count: {len(jobs)}")
     else:
-        logger.error(f"Failed to retrieve data from {url}, status code: {response.status_code}")
+        logger.error(f"Failed to retrieve data from {url}.")
     driver.quit()
     return jobs
