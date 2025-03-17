@@ -2,6 +2,8 @@
 
 End-to-end data ETL pipeline that extracts available jobs, and recommends best ones with a recommender System
 
+Status: WIP, do not run
+
 ## About
 
 ### Scope and impact
@@ -59,12 +61,3 @@ To run this project locally in Docker, follow these steps:
 This project is for non-commercial use.
 
 Thanks to Grupa Pracuj (pracuj.pl) for access to resources that help understand allowed and respectful usage of their site, ie. TOS and robots.txt.
-
-# Stuff for me
-
-- Deploying Clickhouse on a local Docker deployment 
-  - https://medium.com/@kjdeluna/lets-learn-clickhouse-part-2-setting-up-your-local-clickhouse-cluster-using-docker-75b972f4117f
-- Deploying postgres on Docker 
-  - https://www.youtube.com/watch?v=Hs9Fh1fr5s8
-- Build Docker image locally and deploy container using Terraform 
-  - https://agnieszkapasieka.medium.com/build-docker-image-locally-and-deploy-container-using-terraform-6306334fdf0a
