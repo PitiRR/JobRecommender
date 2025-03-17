@@ -1,8 +1,8 @@
 # JobRecommender
 
-End-to-end data ETL pipeline that extracts available jobs, and recommends best ones with a recommender System
+End-to-end data ETL pipeline that extracts available jobs, and recommends best-fitting ones with a recommender System
 
-Status: WIP, do not run
+Status: WIP
 
 ## About
 
@@ -21,20 +21,11 @@ This project runs on-prem with Docker.
 - Dashboards for insights.
 - Tech Stack:
   - Terraform and Docker for infra and deployment,
-    - DevOps and DataOps (CI/CD, GX primarily)
-  - Python 3,
+  - Python 3.9,
   - pandas for transformation and cleaning,
-    - open source
-    - pyspark is overkill; up to 100 rows in-memory at a time
   - Airflow for orchestration,
-    - open source
-    - familiarity over Dagster
-  - Clickhouse for Data Warehouse,
-    - open source
-    - dev-friendly
-    - great integration for ml
+  - Postgresql for data storage,
   - dbt for downstream in-place transformations,
-    - for data marts and further modifications
   - Numpy, Scikit-learn, Tensorflow for ML
   - Apache Superset.
 
@@ -44,7 +35,7 @@ To run this project locally in Docker, follow these steps:
 
 1. `git clone https://github.com/PitiRR/JobRecommender`
 
-1. `cd JobRecommender/infra/terraform`
+1. `cd JobRecommender/terraform`
 
 1. `terraform init`
 
@@ -52,7 +43,7 @@ To run this project locally in Docker, follow these steps:
 
 1. `terraform apply`
 
-1. Run `localhost:9000` in your browser
+1. Run `localhost:8080` in your browser
 
 ## Usage
 
