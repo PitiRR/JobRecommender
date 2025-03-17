@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy import create_engine
 from airflow.decorators import dag, task
+from airflow.operators.empty import EmptyOperator
 
 from dotenv import load_dotenv
 from src.etl.extract import extract_from_jsearch, extract_from_pracuj
@@ -16,7 +17,7 @@ default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'start_date': datetime(2025, 2, 16),
-    'email_on_failure': False,
+    'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
@@ -28,23 +29,23 @@ airflow_email = os.getenv('AIRFLOW_EMAIL')
 
 @dag(
     start_date=datetime(2025, 2, 16),
-    schedule="@daily",
+    schedule_interval="@daily",
     catchup=False,
+    default_args=default_args,
 )
-def create_etl_dag(email = airflow_email):
+def get_jobs_etl(email = airflow_email):
+    """Scrape job postings from jsearch and pracuj.pl, clean the data and load it to the database"""
+    dag_id = 'get_jobs_etl'
     logging.info("Start task initiated")
     start_logger()
 
-    DATABASE_URL = 'postgresql://airflow:airflow@postgres:5432/airflow_metadata'
-    engine = create_engine(DATABASE_URL)
+    database_url = 'postgresql://airflow:airflow@postgres:5432/airflow_metadata'
+    engine = create_engine(database_url)
 
-    @task(task_id='start')
-    def start():
-        """Dummy entrypoint"""
-        logger.info("Starting the ETL pipeline...")
+    start_task = EmptyOperator(task_id='start_task')
 
     @task(task_id='extract_task')
-    def extract():
+    def extract_jobs():
         jsearch_results = extract_from_jsearch()
         logger.info("Finished extracting jsearch_results")
         pracujpl_results = extract_from_pracuj()
@@ -55,32 +56,23 @@ def create_etl_dag(email = airflow_email):
         return df
 
     @task(task_id='transform_task')
-    def transform(**context):
+    def transform_jobs(df):
         """Transform and clean the dataframe"""
-        df = context['task_instance'].xcom_pull(task_ids='extract_task')
         df = clean_data(df)
         return df
 
-    @task(task_id='load_to_db_task')
-    def load(**context):
-        df = context['task_instance'].xcom_pull(task_ids='transform_task')
+    @task(task_id='load_task')
+    def load_to_db(df):
         df.to_sql('job_postings', engine, if_exists='replace', index=False)
         logging.info("DataFrame deployed to job_postings table in the database.")
 
-    @task(task_id='end')
-    def end():
-        """Dummy endpoint"""
-        logger.info("...Finishing the ETL pipeline.")
+    end_task = EmptyOperator(task_id='end_task')
 
-    start_task = start()
-    extract_task = extract()
-    transform_task = transform()
-    load_task = load()
-    end_task = end()
+    df_extracted = extract_jobs()
+    df_transformed = transform_jobs(df_extracted)
+    load_result = load_to_db(df_transformed)
 
-    start_task >> extract_task >> transform_task >> load_task >> end_task
+    start_task >> df_extracted # type: ignore
+    load_result >> end_task # type: ignore
 
-ETL_DAG = create_etl_dag()
-# TODO fix this based on Data Engineer specialization and official docs
-# TODO https://airflow.apache.org/docs/apache-airflow/stable/howto/operator/python.html
-# You're doing great Piotr!
+get_jobs_etl = get_jobs_etl()

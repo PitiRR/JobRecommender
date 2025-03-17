@@ -5,6 +5,8 @@ import requests
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 from src.constants import JSEARCH_QUERY, PRACUJ_QUERY
 from src.models.models import Job
@@ -23,13 +25,16 @@ from src.utils.extract_utils import (
 # [job name, location, date published, sort, ...]
 # websites use different syntax, leading to unique params lists
 
+load_dotenv()
 logger = logging.getLogger(__name__)
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+driver = webdriver.Chrome(options=chrome_options)
 
 def extract_from_jsearch() -> list:
     """
     This function extracts Jobs using rapidapi Jsearch API. It utilizes Google Jobs.
     """
-    load_dotenv()
     rapidapi_key = os.getenv('RAPIDAPI_KEY')
     rapidapi_host = os.getenv('RAPIDAPI_HOST')
 
@@ -42,8 +47,6 @@ def extract_from_jsearch() -> list:
         'x-rapidapi-key': f"{rapidapi_key}",
         'x-rapidapi-host': f"{rapidapi_host}"
     }
-
-    logger.info(f"Running {url}")
     response = requests.get(url, headers=headers, params=querystring, timeout=10)
 
     if response.status_code == 200:
@@ -75,7 +78,7 @@ def extract_from_jsearch() -> list:
                 url = job_data.get('job_apply_link')
             )
             jobs.append(job)
-            logger.debug(f"Jsearch API: successfully added a job. Count: {len(jobs)}")
+            logger.info(f"Jsearch API: successfully added a job. Count: {len(jobs)}")
         return jobs
     logger.error(f"Failed to retrieve data from {url}, status code: {response.status_code}")
     return []
@@ -89,93 +92,114 @@ def extract_from_pracuj() -> list:
     url = PRACUJ_QUERY
     logger.info(f"Running {url}")
 
-    response = requests.get(url, timeout=10)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
+    # browser = start_chrome(url, headless=True) # type: ignore
+    driver.get(url)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    
+    if soup:
         jobs = []
         # Keep only the div with listings
         results = soup.find_all('div', {'data-test': ['positioned-offer', 'default-offer']})
 
+
         for job in results:
-            company = job.find('h3', {'data-test':'text-company-name'}).text.strip()
-            location = job.find('h4', {'data-test':'text-region'}).text.strip()
+            job_company = job.find('h3', {'data-test':'text-company-name'}).text.strip()
+            job_loc = job.find('h4', {'data-test':'text-region'}).text.strip()
             job_url = job.a.get('href')
 
             # Extract remaining required information
             if job_url is not None:
+                soup = None
                 if job_url.startswith('https://pracodawcy.pracuj.pl/'):
                     continue
-                job_response = requests.get(job.a.get('href'), timeout=10)
-                if job_response.status_code == 200:
-                    soup = BeautifulSoup(job_response.content, 'html.parser')
+                driver.get(job_url)
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-                    title = company = desc = location = job_url = ""
-                    level = schedule = mode = requirements = responsibilities = benefits = contract = []
-                    salary = {}
+                if soup.find(job_url):
+                    job_title = job_company = job_desc = job_loc = job_url = ""
+                    job_seniority_level = job_time_schedule = job_office_mode = job_requirements = job_responsibilities = job_benefits = job_contracts = []
+                    job_salaryrange = {}
 
+                    try: 
+                        title_tag = soup.select_one('h1[data-scroll-id="job-title"]')
+                        job_title = getattr(title_tag, 'text').strip()
+                    except (AttributeError, TypeError) as e:
+                        job_title = ""
 
-                    title_tag = soup.select_one('h1[data-scroll-id="job-title"]')
-                    if title_tag:
-                        title = title_tag.text.strip()
+                    try:
+                        level_tag = soup.select_one('li[data-scroll-id="position-levels"] div[data-test="offer-badge-title"]')
+                        job_seniority_level = extract_job_level(getattr(level_tag, 'text').lower())
+                    except (AttributeError, TypeError) as e:
+                        job_seniority_level = ['']
 
-                    level_tag = soup.select_one('li[data-scroll-id="position-levels"] div[data-test="offer-badge-title"]')
-                    if level_tag:
-                        level = extract_job_level(level_tag.get_text(strip=True).lower())
+                    try:
+                        raw_contract_tag = soup.select_one('li[data-scroll-id="contract-types"] div[data-test="offer-badge-title"]')
+                        job_contracts = extract_contract_type(getattr(raw_contract_tag, 'text').lower())
+                    except (AttributeError, TypeError) as e:
+                        job_contracts = ['']
+                    try:
+                        raw_desc = soup.select_one('ul[data-test="text-about-project"]')
+                        job_desc = extract_desc(raw_desc)
+                    except (AttributeError, TypeError) as e:
+                        job_desc = ""
 
-                    raw_contract_tag = soup.select_one('li[data-scroll-id="contract-types"] div[data-test="offer-badge-title"]')
-                    if raw_contract_tag:
-                        contract = extract_contract_type(raw_contract_tag.get_text(strip=True).lower())
+                    try:
+                        raw_mode_tag = soup.select_one('li[data-scroll-id="work-modes"] div[data-test="offer-badge-title"]')
+                        mode_list = list(getattr(raw_mode_tag, 'text').strip().lower().split(','))
+                        job_office_mode = extract_mode(mode_list)
+                    except (AttributeError, TypeError) as e:
+                        job_office_mode = ['']
 
-                    raw_desc = soup.select_one('ul[data-test="text-about-project"]')
-                    if raw_desc:
-                        desc = extract_desc(raw_desc)
+                    try:
+                        raw_schedule_tag = soup.select_one('li[data-scroll-id="work-schedules"] div[data-test="offer-badge-title"]')
+                        schedule_list = list(getattr(raw_schedule_tag, 'text').strip().lower().split(','))
+                        job_time_schedule = extract_schedule(schedule_list) # type: ignore
+                    except (AttributeError, TypeError) as e:
+                        job_time_schedule = ['']
 
-                    raw_mode_tag = soup.select_one('li[data-scroll-id="work-modes"] div[data-test="offer-badge-title"]')
-                    if raw_mode_tag:
-                        mode_list = list(raw_mode_tag.get_text(strip=True).lower().split(','))
-                        mode = extract_mode(mode_list)
+                    try:
+                        raw_comp_tag = soup.select_one('div[data-test="section-salaryPerContractType"]')
+                        job_salaryrange = extract_compensation(raw_comp_tag)
+                    except (AttributeError, TypeError) as e:
+                        job_salaryrange = {}
 
-                    raw_schedule_tag = soup.select_one('li[data-scroll-id="work-schedules"] div[data-test="offer-badge-title"]')
-                    if raw_schedule_tag:
-                        schedule_list = list(raw_schedule_tag.get_text(strip=True).lower().split(','))
-                        schedule = extract_schedule(schedule_list) # type: ignore
+                    try:
+                        raw_resp_tags = soup.select_one('section[data-test="section-responsibilities"]')
+                        if raw_resp_tags:
+                            job_responsibilities = extract_fmt_list_items(raw_resp_tags.select('li'))
+                    except (AttributeError, TypeError) as e:
+                        job_responsibilities = []
 
-                    raw_comp_tag = soup.select_one('div[data-test="section-salaryPerContractType"]')
-                    if raw_comp_tag:
-                        salary = extract_compensation(raw_comp_tag)
+                    try:
+                        raw_reqs_tags = soup.select_one('section[data-test="section-requirements"]')
+                        if raw_reqs_tags:
+                            job_requirements = extract_fmt_list_items(raw_reqs_tags.select('li'))
+                    except (AttributeError, TypeError) as e:
+                        job_requirements = []
 
-                    raw_resp_tags = soup.select_one('section[data-test="section-responsibilities"]')
-                    if raw_resp_tags:
-                        raw_resp_list = raw_resp_tags.select('li')
-                        if raw_resp_list:
-                            responsibilities = extract_fmt_list_items(raw_resp_list)
-
-                    raw_reqs_tags = soup.select_one('section[data-test="section-requirements"]')
-                    if raw_reqs_tags:
-                        raw_reqs_list = raw_reqs_tags.select('li')
-                        if raw_reqs_list:
-                            requirements = extract_fmt_list_items(raw_reqs_list)
-
-                    raw_benefits_list = soup.select_one('section[data-test="section-offered"]') or \
-                                        soup.select_one('section[data-test="section-benefits"]')
-                    if raw_benefits_list:
-                        benefits = extract_benefits(raw_benefits_list)
+                    try:
+                        raw_benefits_list = soup.select_one('section[data-test="section-offered"]') or \
+                                            soup.select_one('section[data-test="section-benefits"]')
+                        if raw_benefits_list:
+                            job_benefits = extract_benefits(raw_benefits_list)
+                    except (AttributeError, TypeError) as e:
+                        job_benefits = []
 
 
                     jobs.append(
                         Job(
-                            title = title,
-                            company = company,
-                            location = location,
-                            description = desc,
-                            mode = mode,
-                            contract = contract,
-                            level = level,
-                            schedule = schedule,
-                            salary = salary,
-                            responsibilities = responsibilities,
-                            requirements = requirements,
-                            benefits = benefits,
+                            title = job_title,
+                            company = job_company,
+                            location = job_loc,
+                            description = job_desc,
+                            mode = job_office_mode,
+                            contract = job_contracts,
+                            level = job_seniority_level,
+                            schedule = job_time_schedule,
+                            salary = job_salaryrange,
+                            responsibilities = job_responsibilities,
+                            requirements = job_requirements,
+                            benefits = job_benefits,
                             url = job_url
                         ))
                 else:
@@ -183,4 +207,5 @@ def extract_from_pracuj() -> list:
             logger.debug(f"Successfully added a job. Count: {len(jobs)}")
     else:
         logger.error(f"Failed to retrieve data from {url}, status code: {response.status_code}")
+    driver.quit()
     return jobs

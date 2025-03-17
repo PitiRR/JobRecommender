@@ -182,3 +182,49 @@ def standardize_compensation(row_salary: dict, period: TimePeriod) -> list[float
 
     logger.debug(f"Standardizing salary: Got {row_salary['min']}-{row_salary['max']} {current_period}, converting to {salary} {period}.")
     return salary
+
+#FIXME: below
+# [2025-03-16, 20:50:43 UTC] {xcom.py:690} ERROR - ('cannot mix list and non-list, non-null values', 'Conversion failed for column salary with type object'). If you are using pickle instead of JSON for XCom, then you need to enable pickle support for XCom in your *** config or make sure to decorate your object with attr.
+# [2025-03-16, 20:50:43 UTC] {taskinstance.py:3313} ERROR - Task failed with exception
+# Traceback (most recent call last):
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 790, in _execute_task
+#     task_instance.xcom_push(key=XCOM_RETURN_KEY, value=xcom_value, session=session_or_null)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/session.py", line 94, in wrapper
+#     return func(*args, **kwargs)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 3645, in xcom_push
+#     XCom.set(
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/api_internal/internal_api_call.py", line 166, in wrapper
+#     return func(*args, **kwargs)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/session.py", line 94, in wrapper
+#     return func(*args, **kwargs)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/xcom.py", line 249, in set
+#     value = cls.serialize_value(
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/xcom.py", line 688, in serialize_value
+#     return json.dumps(value, cls=XComEncoder).encode("UTF-8")
+#   File "/usr/local/lib/python3.9/json/__init__.py", line 234, in dumps
+#     return cls(
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/json.py", line 105, in encode
+#     return super().encode(o)
+#   File "/usr/local/lib/python3.9/json/encoder.py", line 199, in encode
+#     chunks = self.iterencode(o, _one_shot=True)
+#   File "/usr/local/lib/python3.9/json/encoder.py", line 257, in iterencode
+#     return _iterencode(o, 0)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/json.py", line 92, in default
+#     return serialize(o)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/serialization/serde.py", line 149, in serialize
+#     data, serialized_classname, version, is_serialized = _serializers[qn].serialize(o)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/serialization/serializers/pandas.py", line 49, in serialize
+#     table = pa.Table.from_pandas(o)
+#   File "pyarrow/table.pxi", line 4525, in pyarrow.lib.Table.from_pandas
+#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 611, in dataframe_to_arrays
+#     arrays = [convert_column(c, f)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 611, in <listcomp>
+#     arrays = [convert_column(c, f)
+#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 598, in convert_column
+#     raise e
+#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 592, in convert_column
+#     result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+#   File "pyarrow/array.pxi", line 345, in pyarrow.lib.array
+#   File "pyarrow/array.pxi", line 85, in pyarrow.lib._ndarray_to_array
+#   File "pyarrow/error.pxi", line 91, in pyarrow.lib.check_status
+# pyarrow.lib.ArrowInvalid: ('cannot mix list and non-list, non-null values', 'Conversion failed for column salary with type object')

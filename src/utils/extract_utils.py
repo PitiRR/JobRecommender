@@ -1,6 +1,8 @@
 import logging
 import re
 
+from bs4 import ResultSet
+
 from src.constants import EMPLOYMENTS, JOBLEVELS, MODES, SCHEDULES
 
 logger = logging.getLogger(__name__)
@@ -98,7 +100,7 @@ def extract_compensation(raw_compensation_tag) -> dict:
     logger.debug(f"Extracted compensation: {compensation}")
     return compensation
 
-def extract_fmt_list_items(raw_text_list: list) -> list[str]:
+def extract_fmt_list_items(raw_text_list: list|ResultSet) -> list[str]:
     """
         Extract formatted list items.
         Gets text and strips whitespace from a list of HTML elements.
