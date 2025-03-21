@@ -1,22 +1,20 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM apache/airflow:latest-python3.9
 
-# Set the working directory in the container
-WORKDIR /jobrecommender
+USER root
 
-# Copy the current directory contents into the container at /app
-COPY . /jobrecommender
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    chromium \
+    chromium-driver
 
-# Install any needed packages specified in requirements.txt
+COPY requirements.txt .
+COPY scripts/airflow_entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+USER airflow
+
 RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /opt/airflow
 
-RUN curl https://clickhouse.com/ | sh
-
-# Make port 80 available to the world outside this container
-EXPOSE 80
-
-# Define environment variable
-ENV NAME World
-
-# Run app.py when the container launches
-CMD ["python", "app.py"]
+ENTRYPOINT ["/entrypoint.sh"]

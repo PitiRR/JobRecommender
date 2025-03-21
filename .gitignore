@@ -2,8 +2,17 @@
 Thumbs.db
 __pycache__/
 .vscode/
+
+
 .venv
 .env
+
 .terraform
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+.mypy_cache/
 logs/
 notes.md

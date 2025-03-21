@@ -72,7 +72,7 @@ def get_jobs_etl(email = airflow_email):
     df_transformed = transform_jobs(df_extracted)
     load_result = load_to_db(df_transformed)
 
-    start_task >> df_extracted # type: ignore
-    load_result >> end_task # type: ignore
+    start_task >> df_extracted          # type: ignore
+    load_result >> end_task             # type: ignore
 
-get_jobs_etl = get_jobs_etl()
+get_jobs_etl = get_jobs_etl()           # type: ignore

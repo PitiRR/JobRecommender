@@ -19,12 +19,12 @@ resource "docker_container" "postgresql" {
   name  = "postgresql"
   image = "postgres:15"
   env = [
-    "POSTGRES_USER=postgres",
-    "POSTGRES_PASSWORD=postgres"
+    "POSTGRES_USER=${var.db_username}",
+    "POSTGRES_PASSWORD=${var.db_password}",
   ]
   ports {
-    internal = 5432
-    external = 5432
+    internal = var.db_port
+    external = var.db_port
   }
   networks_advanced {
     name = docker_network.airflow_net.name
@@ -35,49 +35,47 @@ resource "docker_container" "postgresql" {
   }
 }
 
+resource "docker_image" "airflow_selenium" {
+  name = "airflow-custom:latest"
+  build {
+    context      = abspath("${path.cwd}/../..")
+    force_remove = true
+  }
+}
+
 # Airflow Container
 resource "docker_container" "airflow" {
-  name  = "airflow" 
-  image = "apache/airflow:latest-python3.9"
+  name  = "airflow"
+  image = docker_image.airflow_selenium.image_id
+
   env = [
     "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
-    "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgresql:5432/airflow_db"
+    "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.airflow_username}:${var.airflow_password}@postgresql:5432/airflow_db",
+    "RAPIDAPI_KEY=${var.rapidapi_key}",
+    "RAPIDAPI_HOST=${var.rapidapi_host}",
+    "GITHUB_TOKEN=${var.github_token}",
+    "AIRFLOW_EMAIL=${var.airflow_email}",
   ]
   ports {
-    internal = 8080
-    external = 8080
+    internal = var.airflow_web_port
+    external = var.airflow_web_port
   }
   networks_advanced {
     name = docker_network.airflow_net.name
   }
-
-
   volumes {
-      host_path      = abspath("${path.cwd}/../dags")
-      container_path = "/opt/airflow/dags"
-    }
-    volumes {
-      host_path      = abspath("${path.cwd}/../src")
-      container_path = "/opt/airflow/plugins/src"
-    }
-    volumes {
-      host_path      = abspath("${path.cwd}/../requirements.txt")
-      container_path = "/opt/airflow/requirements.txt"
-    }  
-    volumes {
-      host_path      = abspath("${path.cwd}/../scripts/airflow_entrypoint.sh")
-      container_path = "/entrypoint.sh"
-    }
-    volumes {
-      host_path      = abspath("${path.cwd}/../logs")
-      container_path = "/opt/airflow/plugins/logs"
-    }
-    volumes {
-      host_path      = abspath("${path.cwd}/../.env")
-      container_path = "/opt/airflow/plugins/.env"
-    }
+    host_path      = abspath("${path.cwd}/../src")
+    container_path = "/opt/airflow/plugins/src"
+  }
+  volumes {
+    host_path      = abspath("${path.cwd}/../dags")
+    container_path = "/opt/airflow/plugins/dags"
+  }
+  volumes {
+    host_path      = abspath("${path.cwd}/../logs")
+    container_path = "/opt/airflow/plugins/logs"
+  }
+  depends_on = [docker_container.postgresql]
 
-    command = ["bash", "-c", "chmod +x /entrypoint.sh && /entrypoint.sh"]
-
-    depends_on = [docker_container.postgresql]
+  command = ["bash", "-c", "airflow webserver"]
 }

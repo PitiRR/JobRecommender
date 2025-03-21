@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Union
 
 from bs4 import ResultSet
 
@@ -100,11 +101,8 @@ def extract_compensation(raw_compensation_tag) -> dict:
     logger.debug(f"Extracted compensation: {compensation}")
     return compensation
 
-def extract_fmt_list_items(raw_text_list: list|ResultSet) -> list[str]:
-    """
-        Extract formatted list items.
-        Gets text and strips whitespace from a list of HTML elements.
-    """
+def extract_fmt_list_items(raw_text_list: Union[list, ResultSet]) -> list[str]:
+    """Extract preformatted list items. Gets text and strips whitespace from a list of HTML elements."""
     return [li.text.strip() for li in raw_text_list]
 
 def extract_benefits(raw_benefits_list):

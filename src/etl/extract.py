@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 from src.constants import JSEARCH_QUERY, PRACUJ_QUERY
 from src.models.models import Job
@@ -29,7 +31,10 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 chrome_options = Options()
 chrome_options.add_argument("--headless")
-driver = webdriver.Chrome(options=chrome_options)
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=chrome_options
+)
 
 def extract_from_jsearch() -> list:
     """

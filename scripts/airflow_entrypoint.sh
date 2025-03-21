@@ -1,6 +1,7 @@
 #!/bin/bash
 
-pip install -r /opt/airflow/requirements.txt
+echo "Waiting for PostgreSQL..."
+while ! nc -z postgresql 5432; do sleep 1; done
 
 airflow db init
 airflow users create \
@@ -10,5 +11,5 @@ airflow users create \
     --lastname airflow \
     --role Admin \
     --email m421rifle@gmail.com
-airflow scheduler &
-airflow webserver
+
+exec airflow "$@"
