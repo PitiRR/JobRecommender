@@ -35,18 +35,10 @@ resource "docker_container" "postgresql" {
   }
 }
 
-resource "docker_image" "airflow_selenium" {
-  name = "airflow-custom:latest"
-  build {
-    context      = abspath("${path.cwd}/../..")
-    force_remove = true
-  }
-}
-
 # Airflow Container
 resource "docker_container" "airflow" {
   name  = "airflow"
-  image = docker_image.airflow_selenium.image_id
+  image = "airflow-selenium:latest"
 
   env = [
     "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
@@ -69,13 +61,12 @@ resource "docker_container" "airflow" {
   }
   volumes {
     host_path      = abspath("${path.cwd}/../dags")
-    container_path = "/opt/airflow/plugins/dags"
+    container_path = "/opt/airflow/dags"
   }
   volumes {
     host_path      = abspath("${path.cwd}/../logs")
     container_path = "/opt/airflow/plugins/logs"
   }
   depends_on = [docker_container.postgresql]
-
-  command = ["bash", "-c", "airflow webserver"]
+  command = ["webserver"]
 }

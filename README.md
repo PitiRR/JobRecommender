@@ -37,6 +37,9 @@ To run this project locally in Docker, follow these steps:
 
 1. `cd JobRecommender/terraform`
 
+1. `docker build -t airflow-selenium:latest ../`
+   - Building via Terraform returns 'unexpected EOF' error.
+
 1. `terraform init`
 
 1. `terraform plan`
@@ -48,6 +51,18 @@ To run this project locally in Docker, follow these steps:
 ## Usage
 
 ## Notes
+
+### Dockerfile
+
+I think Airflow + Selenium is a useful deployment combination. I tried to parameterize it to a reasonable way and I hope whoever reads this finds it useful, as I wasn't satisfied with what I found on the web.
+
+Since Selenium 4.11, you don't need to download the browser driver or even the browser! However, you still need the dependencies. Not something you'd even think about if running in your workstation CLI, but essential to have - containers don't come with those. `scripts/chrome_dependencies.sh` sorts this out.
+
+Selenium should store the browser/browserdriver binaries in `/home/airflow/.cache/selenium/...`. You can find required dependencies by running `ldd chrome`, for example.
+
+Finally, unlike official docker-compose, airflow image doesn't create the user or run webserver out of the box. You need to do it yourself.
+
+### Other
 
 This project is for non-commercial use.
 

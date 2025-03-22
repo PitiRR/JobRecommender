@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 
 import requests
 
@@ -7,8 +8,6 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 from src.constants import JSEARCH_QUERY, PRACUJ_QUERY
 from src.models.models import Job
@@ -23,18 +22,20 @@ from src.utils.extract_utils import (
     extract_benefits
 )
 
-# params list contains parameters in the following order:
-# [job name, location, date published, sort, ...]
-# websites use different syntax, leading to unique params lists
-
 load_dotenv()
 logger = logging.getLogger(__name__)
+
 chrome_options = Options()
 chrome_options.add_argument("--headless")
-driver = webdriver.Chrome(
-    service=Service(ChromeDriverManager().install()),
-    options=chrome_options
-)
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--no-first-run")
+chrome_options.add_argument("--disable-extensions")
+chrome_options.add_argument("--disable-default-apps")
+chrome_options.add_argument("--incognito")
+temp_profile = tempfile.mkdtemp()
+chrome_options.add_argument(f"--user-data-dir={temp_profile}")
+driver = webdriver.Chrome(options=chrome_options)
 
 def extract_from_jsearch() -> list:
     """
@@ -85,7 +86,8 @@ def extract_from_jsearch() -> list:
             jobs.append(job)
             logger.info(f"Jsearch API: successfully added a job. Count: {len(jobs)}")
         return jobs
-    logger.error(f"Failed to retrieve data from {url}, status code: {response.status_code}")
+    else:
+        logger.error(f"Failed to retrieve data from {url}.")
     return []
 
 
@@ -95,7 +97,7 @@ def extract_from_pracuj() -> list:
     """
     # Extract job postings from pracuj.pl
     url = PRACUJ_QUERY
-    logger.info(f"Running {url}")
+    logger.info(f"Pracuj.pl: Running {url}")
 
     # browser = start_chrome(url, headless=True) # type: ignore
     driver.get(url)
@@ -111,25 +113,25 @@ def extract_from_pracuj() -> list:
             job_company = job.find('h3', {'data-test':'text-company-name'}).text.strip()
             job_loc = job.find('h4', {'data-test':'text-region'}).text.strip()
             job_url = job.a.get('href')
+            job_title = job.find('h2', {'data-test':'offer-title'}).text.strip()
 
             # Extract remaining required information
             if job_url is not None:
-                soup = None
                 if job_url.startswith('https://pracodawcy.pracuj.pl/'):
                     continue
+                logger.info(f"Pracuj.pl: Extracting job: {job_url}")
                 driver.get(job_url)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-                if soup.find(job_url):
-                    job_title = job_company = job_desc = job_loc = job_url = ""
+                if job_title == soup.find('h1', {'data-scroll-id': 'job-title'}).text.strip(): # type: ignore
+                    job_company = job_desc = job_loc = job_url = ""
                     job_seniority_level = job_time_schedule = job_office_mode = job_requirements = job_responsibilities = job_benefits = job_contracts = []
                     job_salaryrange = {}
 
-                    try: 
-                        title_tag = soup.select_one('h1[data-scroll-id="job-title"]')
-                        job_title = getattr(title_tag, 'text').strip()
-                    except (AttributeError, TypeError) as e:
-                        job_title = ""
+                    # try: 
+                    #     title_tag = soup.select_one('h1[data-scroll-id="job-title"]')
+                    #     job_title = getattr(title_tag, 'text').strip()
+                    # except (AttributeError, TypeError) as e:
+                    #     job_title = ""
 
                     try:
                         level_tag = soup.select_one('li[data-scroll-id="position-levels"] div[data-test="offer-badge-title"]')
@@ -209,7 +211,7 @@ def extract_from_pracuj() -> list:
                         ))
                 else:
                     logger.error(f"Failed to retrieve more job details from {job_url}.")
-            logger.debug(f"Successfully added a job. Count: {len(jobs)}")
+            logger.info(f"Successfully added a job. Count: {len(jobs)}")
     else:
         logger.error(f"Failed to retrieve data from {url}.")
     driver.quit()
