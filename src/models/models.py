@@ -47,21 +47,21 @@ class Job:
                  requirements:      list[str],
                  responsibilities:  list[str],
                  benefits:          list[str],
-                 salary:            dict,
+                 salary:            list[int],
                  url:               str):
         self.added_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.title = title
         self.company = company
-        self.location = location
-        self.description = description
-        self.requirements = requirements
-        self.responsibilities = responsibilities
-        self.level = level
-        self.schedule = schedule
-        self.mode = mode
-        self.contract = contract
-        self.benefits = benefits
-        self.salary = salary
+        self.location = location if location else ""
+        self.description = description if description else ""
+        self.requirements = requirements if requirements else []
+        self.responsibilities = responsibilities if responsibilities else []
+        self.level = level if level else []
+        self.schedule = schedule if schedule else []
+        self.mode = mode if mode else []
+        self.contract = contract if contract else []
+        self.benefits = benefits if benefits else []
+        self.salary = salary if salary else []
         self.url = url
 
     def __repr__(self):

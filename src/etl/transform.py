@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -8,37 +9,51 @@ from openai import OpenAI
 from src.constants import SYSTEM_MESSAGE, TimePeriod
 from src.utils.transform_utils import extract_sections
 
-# 3. Ensure consistency
-# For jsearch results specifically:
-# Requirements, benefits, etc. are empty, but they're contained in the description.
-# Use LLM to extract? Find the correct section by looking for keywords?
-
 logger = logging.getLogger(__name__)
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-        (describe what the function actually cleans)
-    """
-    # df = df.drop_duplicates(subset=['url'])
-    # logger.debug("Dropped duplicates")
+    """Drop rows with missing values, extract features from desc, and standardize compensation."""
+    df = df.drop_duplicates(subset=['url'])
+    logger.info("Dropped duplicates")
 
     df = df.dropna(subset=['title', 'company','url'])
-    logger.debug("Dropped rows with missing title, company, or url")
+    logger.info("Dropped rows with missing title, company, or url")
 
-    logger.debug("Starting extract_features_from_desc")
-    for idx, row in df.iterrows():
-        if row[['requirements', 'responsibilities', 'benefits']].isna().any():
-            logger.warning(f"Row {idx} is missing requirements, responsibilities, or benefits")
-            # features = extract_features_from_desc(row)
-            # df.at[idx, 'requirements'] = features[0]
-            # df.at[idx, 'responsibilities'] = features[1]
-            # df.at[idx, 'benefits'] = features[2]
+    list_columns = ['level', 'schedule', 'mode', 'contract', 'requirements', 'responsibilities', 'benefits']
+    # Some columns contain nested structures, Xcom zealously converts them - causes nested list error.
+    for col in list_columns:
+        # Ensure all entries are lists
+        df[col] = df[col].apply(lambda x: x if isinstance(x, list) else [])
+        
+        # Flatten nested structures and sanitize strings
+        df[col] = df[col].apply(
+            lambda lst: [
+                str(item)
+                .replace("{", "").replace("}", "")  # Remove dict braces
+                .replace("#", "")                   # Remove markdown
+                .strip()
+                for item in lst
+            ]
+        )
+        # Convert list/JSON columns to JSON strings for XCom compatibility
+        df[col] = df[col].apply(json.dumps)
+
+    logger.info("Starting extract_features_from_desc")    
+    # for idx, row in df.iterrows():
+    #     features = extract_features_from_desc(row)
+    #     df.at[idx, 'requirements'] = features[0]
+    #     df.at[idx, 'responsibilities'] = features[1]
+    #     df.at[idx, 'benefits'] = features[2]
+
+    # for idx, row in df.iterrows():
+    #     if row[['requirements', 'responsibilities', 'benefits']].isna().any():
+    #         logger.warning(f"Row {idx} is missing requirements, responsibilities, or benefits")
+    #         features = extract_features_from_desc(row)
+    #         df.at[idx, 'requirements'] = features[0]
+    #         df.at[idx, 'responsibilities'] = features[1]
+    #         df.at[idx, 'benefits'] = features[2]
     logger.info("Finished extract_features_from_desc")
-
-    for idx, row in df.iterrows():
-        if isinstance(row['salary'], dict) and 'min' in row['salary'] and row['salary']['min'] is not None:
-            df.at[idx, 'salary'] = standardize_compensation(row['salary'], TimePeriod.MONTHLY)
-
+    
     return df
 
 def extract_features_from_desc(row: pd.Series) -> list:
@@ -133,7 +148,7 @@ def ai_summarize_list(prompt: str) -> str:
 
     return response.choices[0].message.content # type: ignore
 
-def standardize_compensation(row_salary: dict, period: TimePeriod) -> list[float]:
+def standardize_compensation(compensation: dict, period: TimePeriod) -> list[int]:
     """
         Standardize the units of compensation field.
         1. Make the time period uniform
@@ -142,6 +157,13 @@ def standardize_compensation(row_salary: dict, period: TimePeriod) -> list[float
         4. Adjust the column and trim of redundant data.
 
         period: The intended target time period for the salary to transform into.
+        compensation = {
+            'min': float(min_str) if min_str else None, 
+            'max': float(max_str) if max_str else None,
+            'currency': currency if currency else None,
+            'tax': taxperiod[0] if taxperiod else None,
+            'period': taxperiod[1] if taxperiod else None
+        }
     """
     period_conversion = {
         TimePeriod.HOURLY: {
@@ -170,61 +192,10 @@ def standardize_compensation(row_salary: dict, period: TimePeriod) -> list[float
         }
     }
 
-    # Remove trailing dots and whitespace from row's period
-    current_period = row_salary['period'].strip().rstrip('.')
-    # Get the conversion factor for the current period
+    current_period = compensation['period'].strip().rstrip('.')
     conversion_factor = period_conversion[period].get(current_period, 1)
-    logger.debug(f"Standardizing salary: Conversion factor {conversion_factor}.")
-    salary = [
-        float(row_salary['min'] * conversion_factor),
-        float(row_salary['max'] * conversion_factor)
-    ]
-
-    logger.debug(f"Standardizing salary: Got {row_salary['min']}-{row_salary['max']} {current_period}, converting to {salary} {period}.")
-    return salary
-
-#FIXME: below
-# [2025-03-16, 20:50:43 UTC] {xcom.py:690} ERROR - ('cannot mix list and non-list, non-null values', 'Conversion failed for column salary with type object'). If you are using pickle instead of JSON for XCom, then you need to enable pickle support for XCom in your *** config or make sure to decorate your object with attr.
-# [2025-03-16, 20:50:43 UTC] {taskinstance.py:3313} ERROR - Task failed with exception
-# Traceback (most recent call last):
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 790, in _execute_task
-#     task_instance.xcom_push(key=XCOM_RETURN_KEY, value=xcom_value, session=session_or_null)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/session.py", line 94, in wrapper
-#     return func(*args, **kwargs)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 3645, in xcom_push
-#     XCom.set(
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/api_internal/internal_api_call.py", line 166, in wrapper
-#     return func(*args, **kwargs)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/session.py", line 94, in wrapper
-#     return func(*args, **kwargs)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/xcom.py", line 249, in set
-#     value = cls.serialize_value(
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/xcom.py", line 688, in serialize_value
-#     return json.dumps(value, cls=XComEncoder).encode("UTF-8")
-#   File "/usr/local/lib/python3.9/json/__init__.py", line 234, in dumps
-#     return cls(
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/json.py", line 105, in encode
-#     return super().encode(o)
-#   File "/usr/local/lib/python3.9/json/encoder.py", line 199, in encode
-#     chunks = self.iterencode(o, _one_shot=True)
-#   File "/usr/local/lib/python3.9/json/encoder.py", line 257, in iterencode
-#     return _iterencode(o, 0)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/utils/json.py", line 92, in default
-#     return serialize(o)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/serialization/serde.py", line 149, in serialize
-#     data, serialized_classname, version, is_serialized = _serializers[qn].serialize(o)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/airflow/serialization/serializers/pandas.py", line 49, in serialize
-#     table = pa.Table.from_pandas(o)
-#   File "pyarrow/table.pxi", line 4525, in pyarrow.lib.Table.from_pandas
-#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 611, in dataframe_to_arrays
-#     arrays = [convert_column(c, f)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 611, in <listcomp>
-#     arrays = [convert_column(c, f)
-#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 598, in convert_column
-#     raise e
-#   File "/home/airflow/.local/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 592, in convert_column
-#     result = pa.array(col, type=type_, from_pandas=True, safe=safe)
-#   File "pyarrow/array.pxi", line 345, in pyarrow.lib.array
-#   File "pyarrow/array.pxi", line 85, in pyarrow.lib._ndarray_to_array
-#   File "pyarrow/error.pxi", line 91, in pyarrow.lib.check_status
-# pyarrow.lib.ArrowInvalid: ('cannot mix list and non-list, non-null values', 'Conversion failed for column salary with type object')
+    
+    min_salary = int(compensation['min'] * conversion_factor)
+    max_salary = int(compensation.get('max', compensation['min']) * conversion_factor)
+    
+    return [min_salary, max_salary]

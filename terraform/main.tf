@@ -43,6 +43,7 @@ resource "docker_container" "airflow" {
   env = [
     "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
     "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.airflow_username}:${var.airflow_password}@postgresql:5432/airflow_db",
+    "AIRFLOW__CORE__LOAD_EXAMPLES=False",
     "RAPIDAPI_KEY=${var.rapidapi_key}",
     "RAPIDAPI_HOST=${var.rapidapi_host}",
     "GITHUB_TOKEN=${var.github_token}",

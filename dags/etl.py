@@ -1,14 +1,16 @@
+import json
 import logging
 import os
 from datetime import datetime, timedelta
 
 import pandas as pd
-from sqlalchemy import create_engine
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
+from sqlalchemy import create_engine
 
 from dotenv import load_dotenv
 from src.etl.extract import extract_from_jsearch, extract_from_pracuj
+from src.etl.load import load_to_db
 from src.etl.transform import clean_data
 from src.utils.config import start_logger
 
@@ -39,9 +41,6 @@ def get_jobs_etl(email = airflow_email):
     logging.info("Start task initiated")
     start_logger()
 
-    database_url = 'postgresql://airflow:airflow@postgres:5432/airflow_metadata'
-    engine = create_engine(database_url)
-
     start_task = EmptyOperator(task_id='start_task')
 
     @task(task_id='extract_task')
@@ -62,15 +61,17 @@ def get_jobs_etl(email = airflow_email):
         return df
 
     @task(task_id='load_task')
-    def load_to_db(df):
-        df.to_sql('job_postings', engine, if_exists='replace', index=False)
-        logging.info("DataFrame deployed to job_postings table in the database.")
+    def load(df):
+        database_url = "postgresql://jobs_user:jobs_pass@postgres:5432/jobs_db"
+        engine = create_engine(database_url)
+        load_to_db(df, engine)
+        logging.info("Finished deploying to job_postings table in the database.")
 
     end_task = EmptyOperator(task_id='end_task')
 
     df_extracted = extract_jobs()
     df_transformed = transform_jobs(df_extracted)
-    load_result = load_to_db(df_transformed)
+    load_result = load(df_transformed)
 
     start_task >> df_extracted          # type: ignore
     load_result >> end_task             # type: ignore

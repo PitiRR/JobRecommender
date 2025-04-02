@@ -4,7 +4,8 @@ from typing import Union
 
 from bs4 import ResultSet
 
-from src.constants import EMPLOYMENTS, JOBLEVELS, MODES, SCHEDULES
+from src.constants import EMPLOYMENTS, JOBLEVELS, MODES, SCHEDULES, TimePeriod
+from src.etl.transform import standardize_compensation
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +75,13 @@ def extract_schedule(raw_schedule_text: str) -> list[str]:
     logger.debug(f"Extracted available schedules: {schedule}")
     return schedule
 
-def extract_compensation(raw_compensation_tag) -> dict:
+def extract_compensation(raw_compensation_tag) -> list[int]:
     """
         Extract compensation data.
         Most tags contain a salary range (some don't), currency, tax indication and period.
     """
     min_str = max_str = currency = taxperiod = None
+    salary_range = []
     earning_amount_div = raw_compensation_tag.find('div', {'data-test': 'text-earningAmount'})
     if earning_amount_div:
         range_parts = re.split(r'[–-]', earning_amount_div.get_text(strip=True))
@@ -98,8 +100,10 @@ def extract_compensation(raw_compensation_tag) -> dict:
         'tax': taxperiod[0] if taxperiod else None,
         'period': taxperiod[1] if taxperiod else None
     }
+    if compensation['min']:
+        salary_range = standardize_compensation(compensation, TimePeriod.MONTHLY)
     logger.debug(f"Extracted compensation: {compensation}")
-    return compensation
+    return salary_range
 
 def extract_fmt_list_items(raw_text_list: Union[list, ResultSet]) -> list[str]:
     """Extract preformatted list items. Gets text and strips whitespace from a list of HTML elements."""

@@ -16,7 +16,7 @@ This project runs on-prem with Docker.
 
 - Onprem (Docker).
 - Batch ingestion (daily) ETL pipeline.
-- Dimensional data model in a data warehouse.
+- Database to retain historical data.
 - Machine learning model for recommendations.
 - Dashboards for insights.
 - Tech Stack:
@@ -61,6 +61,11 @@ Since Selenium 4.11, you don't need to download the browser driver or even the b
 Selenium should store the browser/browserdriver binaries in `/home/airflow/.cache/selenium/...`. You can find required dependencies by running `ldd chrome`, for example.
 
 Finally, unlike official docker-compose, airflow image doesn't create the user or run webserver out of the box. You need to do it yourself.
+
+### Areas to explore
+
+- Data Warehouse for additional analytics, bi or downstream use. 
+  - Clickhouse seems good.
 
 ### Other
 
