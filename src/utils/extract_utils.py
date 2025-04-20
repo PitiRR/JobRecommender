@@ -9,7 +9,7 @@ from src.etl.transform import standardize_compensation
 
 logger = logging.getLogger(__name__)
 
-def extract_job_level(raw_level_text: str) -> list:
+def extract_job_level(raw_level_text):
     """
 
     """
@@ -25,10 +25,11 @@ def extract_job_level(raw_level_text: str) -> list:
             level.append("senior")
         if not level:
             level.append("other")
+        return level
     logger.debug(f"Extracted available job levels: {level}")
-    return level
+    return None
 
-def extract_contract_type(raw_contract_text: str) -> list[str]:
+def extract_contract_type(raw_contract_text):
     contract = []
     if raw_contract_text:
         if any(perma_kw in raw_contract_text for perma_kw in EMPLOYMENTS["permanent"]):
@@ -37,8 +38,9 @@ def extract_contract_type(raw_contract_text: str) -> list[str]:
             contract.append("b2b")
         if not contract:
             contract.append("other")
+        return contract
     logger.debug(f"Extracted available contract types: {contract}")
-    return contract
+    return None
 
 def extract_desc(raw_desc):
     """
@@ -50,20 +52,22 @@ def extract_desc(raw_desc):
     logger.debug(f"Extracted description (head): {desc[0]}")
     return '\n'.join(desc)
 
-def extract_mode(raw_mode_text: list[str]) -> list[str]:
+def extract_mode(raw_mode_text):
     mode = []
-    if any(remote_kw in raw_mode_text for remote_kw in MODES["remote"]):
-        mode.append("remote")
-    if any(office_kw in raw_mode_text for office_kw in MODES["office"]):
-        mode.append("office")
-    if any(hybrid_kw in raw_mode_text for hybrid_kw in MODES["hybrid"]):
-        mode.append("hybrid")
-    if any(mobile_kw in raw_mode_text for mobile_kw in MODES["mobile"]):
-        mode.append("mobile")
+    if raw_mode_text:
+        if any(remote_kw in raw_mode_text for remote_kw in MODES["remote"]):
+            mode.append("remote")
+        if any(office_kw in raw_mode_text for office_kw in MODES["office"]):
+            mode.append("office")
+        if any(hybrid_kw in raw_mode_text for hybrid_kw in MODES["hybrid"]):
+            mode.append("hybrid")
+        if any(mobile_kw in raw_mode_text for mobile_kw in MODES["mobile"]):
+            mode.append("mobile")
+        return mode
     logger.debug(f"Extracted available work modes: {mode}")
-    return mode
+    return None
 
-def extract_schedule(raw_schedule_text: str) -> list[str]:
+def extract_schedule(raw_schedule_text):
     schedule = []
     if raw_schedule_text:
         if any(fulltime_kw in raw_schedule_text for fulltime_kw in SCHEDULES["full-time"]):
@@ -72,10 +76,11 @@ def extract_schedule(raw_schedule_text: str) -> list[str]:
             schedule.append("part-time")
         if not schedule:
             schedule.append("other")
+        return schedule
     logger.debug(f"Extracted available schedules: {schedule}")
-    return schedule
+    return None
 
-def extract_compensation(raw_compensation_tag) -> list[int]:
+def extract_compensation(raw_compensation_tag):
     """
         Extract compensation data.
         Most tags contain a salary range (some don't), currency, tax indication and period.
@@ -94,6 +99,7 @@ def extract_compensation(raw_compensation_tag) -> list[int]:
         currency = earning_amount_div.find('div').get_text(strip=True)
         taxperiod = earning_amount_div.find_next_sibling('div').text.split('/')
     compensation = {
+        # Might use that information for later maybe
         'min': float(min_str) if min_str else None, 
         'max': float(max_str) if max_str else None,
         'currency': currency if currency else None,
@@ -105,7 +111,7 @@ def extract_compensation(raw_compensation_tag) -> list[int]:
     logger.debug(f"Extracted compensation: {compensation}")
     return salary_range
 
-def extract_fmt_list_items(raw_text_list: Union[list, ResultSet]) -> list[str]:
+def extract_fmt_list_items(raw_text_list):
     """Extract preformatted list items. Gets text and strips whitespace from a list of HTML elements."""
     return [li.text.strip() for li in raw_text_list]
 
@@ -120,4 +126,4 @@ def extract_benefits(raw_benefits_list):
                                   {'data-test': 'text-benefit-title'})]
         logger.debug(f"Extracted benefits (head): {formatted_benefits_list[0]}")
         return formatted_benefits_list
-    return []
+    return None

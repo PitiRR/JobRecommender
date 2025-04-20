@@ -28,40 +28,44 @@ class Job:
         The requirements for the job, ie. what the employee should have already.
     benefits : list
         The benefits offered by the job.
-    salary : str
-        The salary range for the job. Represented in yearly salary.
+    sal_min : int
+        Minimum salary provided in the range. Represented in monthly salary.
+    sal_max : int
+        Maximum salary provided in the range. Represented in monthly salary.
     url : str
         The URL of the job posting, where every detail is accessible.
     id : str
         The unique identifier for the job, uses uuid4.
     """
     def __init__(self,
-                 title:             str,
-                 company:           str,
-                 description:       str,
-                 location:          str,
-                 level:             list[str],
-                 schedule:          list[str],
-                 mode:              list[str],
-                 contract:          list[str],
-                 requirements:      list[str],
-                 responsibilities:  list[str],
-                 benefits:          list[str],
-                 salary:            list[int],
-                 url:               str):
+                 title:             str | None,
+                 company:           str | None,
+                 description:       str | None,
+                 location:          str | None,
+                 level:             list[str] | None,
+                 schedule:          list[str] | None,
+                 mode:              list[str] | None,
+                 contract:          list[str] | None,
+                 requirements:      list[str] | None,
+                 responsibilities:  list[str] | None,
+                 benefits:          list[str] | None,
+                 sal_min:           int | None,
+                 sal_max:           int | None,
+                 url:               str | None):
         self.added_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.title = title
         self.company = company
-        self.location = location if location else ""
-        self.description = description if description else ""
-        self.requirements = requirements if requirements else []
-        self.responsibilities = responsibilities if responsibilities else []
-        self.level = level if level else []
-        self.schedule = schedule if schedule else []
-        self.mode = mode if mode else []
-        self.contract = contract if contract else []
-        self.benefits = benefits if benefits else []
-        self.salary = salary if salary else []
+        self.location = location if location else None
+        self.description = description if description else None
+        self.requirements = requirements if requirements else None
+        self.responsibilities = responsibilities if responsibilities else None
+        self.level = level if level else None
+        self.schedule = schedule if schedule else None
+        self.mode = mode if mode else None
+        self.contract = contract if contract else None
+        self.benefits = benefits if benefits else None
+        self.sal_min = sal_min if sal_min else None
+        self.sal_max = sal_max if sal_max else None
         self.url = url
 
     def __repr__(self):
@@ -78,6 +82,8 @@ class Job:
             responsibilities={self.responsibilities},
             requirements={self.requirements},
             benefits={self.benefits},
+            sal_min={self.sal_min},
+            sal_max={self.sal_max},
             url={self.url},
             added_date={self.added_date}
             )"""

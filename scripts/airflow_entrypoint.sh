@@ -12,5 +12,4 @@ airflow users create \
     --role Admin \
     --email m421rifle@gmail.com
 
-airflow scheduler &
-airflow webserver
+exec airflow "$@"
