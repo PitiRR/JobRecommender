@@ -6,12 +6,11 @@ from src.models.models import Job
 from src.etl.extract import extract_from_jsearch, extract_from_pracuj
 from src.etl.transform import clean_data
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main():
-    """
-        Entrypoint. Useful to run python code locally.
-    """
+    """Entrypoint. Useful to run python code locally."""
     # jsearch_results:list[Job] = extract_from_jsearch()
     logger.info("Finished jsearch_results")
     pracujpl_results:list[Job] = extract_from_pracuj()
@@ -26,5 +25,7 @@ def main():
                           'display.max_rows', None,
                           'display.max_colwidth', None):
         print(df.head())
+    df.to_csv("output.csv", index=False)
+
 if __name__ == "__main__":
     main()

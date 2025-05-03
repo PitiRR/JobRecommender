@@ -31,75 +31,62 @@ class TimePeriod(Enum):
     YEARLY = auto()
 
 SYSTEM_MESSAGE = """
-Your task is to analyze job postings and extract standardized keywords from strictly defined lists. Follow these rules:
+Extract predefined Technical or Benefits keywords from job posting text. The first word indicates the category (responsibilities, requirements, benefits) and determines which keyword list to use.
 
-1. **Core Function**:
-   - Map responsibilities/requirements to technical keywords
-   - Map benefits to benefits keywords
-   - The first word in the input will indicate the category (responsibilities, requirements, benefits)
+**Instructions:**
 
-2. **Processing Rules**:
-   a) Replace bracketed placeholders ((X)) with actual instances from context
-      Example: "Experience with Azure Data Factory" → "Azure" because (cloud platform) is in the list
-   b) Include ONLY ONE YOE marker: 
-      - Use "5+ YOE" for 5+ years mentioned
-      - "0-4 YOE" for <5 years
-      - Prioritize explicit statements over implied experience
-      Example: "3 years of experience as a Data Engineer" → "0-4 YOE"
+1.  **Keyword Mapping:**
+    * Map responsibilities/requirements text -> **Technical Keywords**.
+    * Map benefits text -> **Benefits Keywords**.
+    * Replace placeholders like `(cloud platform)` with specific instances found in the text (e.g., "Azure Data Factory" maps to "Azure" if `(cloud platform)` is in the list).
+    * Standardize experience: Use "5+ YOE" for 5+ years, "0-4 YOE" for <5 years. Prioritize explicit mentions.
 
-3. **Output Requirements**:
-   - Strict comma-separated format: Keyword1, Keyword2, Keyword3
-   - No explanations, numbers, or special characters
-   - English-only output regardless of input language
-   - Remove duplicates and non-list terms
-   - Do not add quotation marks or the name of the outputted list. Only keywords separated by commas are accepted.
+2.  **Output Requirements:**
+    * Format: Comma-separated keywords ONLY (e.g., `Keyword1,Keyword2`).
+    * Content: Must be keywords strictly from the provided lists. English only. Deduplicated.
+    * Exclusions: No quotes, explanations, numbers, non-list terms, or special characters.
 
-4. **Priority Handling**:
-   - If multiple categories apply, choose the most specific technical term first
-   - For conflicting items (e.g., both "Remote Work" and "Hybrid Work"), include both
-   - Always prioritize explicit mentions over inferred terms
-
-5. **Quality Control**:
-   - Ignore non-standard terms not in provided keyword lists
-   - Exclude ambiguous items rather than guessing
-   - Validate all replacements against original context
+3.  **Prioritization & Quality:**
+    * Prioritize specific technical terms over general ones if multiple apply.
+    * Include conflicting benefits if mentioned (e.g., both "Remote Work", "Hybrid Work").
+    * Explicit mentions > inferred terms.
+    * Ignore ambiguous terms or terms not in the lists. Validate placeholder replacements against context.
+    * Input text may be in a different language. Output is always in English.
 
 **Technical Keywords:** [
-    "ETL", "ELT", "SQL", "Data Warehousing", "Data Lakes", "Delta Lake", 
-    "Apache Iceberg", "Apache Hudi", "CDC", "Stream Processing", 
-    "Batch Processing", "Data Partitioning", "Data Serialization",
-    "Avro/Parquet", "ORC Files", "Protobuf", "Data Versioning", "Data Architecture",
-    "Schema Evolution", "Data Lineage", "Apache Flink", "Apache Beam",
-    "Debezium", "dbt", "Airbyte", "Fivetran", "(cloud platform)", "Kafka", 
-    "Spark Streaming", "Presto/Trino", "Hive Metastore",  "Great Expectations", 
-    "DataHub", "Amundsen", "Lakehouse Architecture", "Serverless Functions", 
-    "Distributed Systems", "Sharding/Replication", "Auto-Scaling",  "IaC", 
-    "Cloud Storage", "VPC Networking", "Query Optimization", "Cost Optimization", 
-    "Data Compression", "Encryption", "RBAC/IAM", "GDPR", "Data Masking", 
-    "Audit Logging", "5+ YOE", "0-4 YOE", "Computer Science degree","Reporting", 
-    "Algorithm Development", "Research", "Version Control", "Scripting", "Clickhouse",
-    "DataOps", "DevOps", "Agile", "Apache Spark", "Data Modeling", "Data Governance",]  
+    ETL, ELT, SQL, Data Warehousing, Data Lakes, Lakehouse Architecture, Delta Lake, Apache Iceberg, 
+    Apache Hudi, CDC (Change Data Capture), Stream Processing, Batch Processing, Apache Spark, 
+    Spark Streaming, Apache Flink, Apache Beam, Kafka, Data Partitioning, Data Serialization, 
+    Avro/Parquet, ORC Files, Protobuf, PostgreSQL, MySQL, MongoDB, NoSQL, Redis, Cassandra, Clickhouse, 
+    Graph Databases, Presto/Trino, Hive Metastore, Query Optimization, Python, Java, Scala, Go, C++, C#, 
+    JavaScript, TypeScript, Rust, Scripting, Object-Oriented Programming (OOP), Functional Programming,
+    REST APIs, GraphQL, Microservices Architecture, Node.js, Django, Flask, Spring Boot, Ruby on Rails, 
+    .NET Core, React, Angular, Vue.js, (cloud platform), AWS, Azure, GCP, Cloud Storage, Serverless Functions, 
+    Distributed Systems, Sharding/Replication, Auto-Scaling, IaC (Infrastructure as Code), Terraform, 
+    VPC Networking, Cost Optimization, Data Compression, Docker, Kubernetes, Data Modeling, Data Architecture, 
+    Data Governance, Schema Evolution, Data Lineage, Data Versioning, Data Quality, Great Expectations, DataHub, 
+    Amundsen, GDPR, Data Masking, Encryption, RBAC/IAM, Version Control, Git, CI/CD, Jenkins, GitLab CI, GitHub Actions, 
+    CircleCI, DevOps, DataOps, Agile, System Design, Scalability, Performance Tuning, Testing, Unit Testing, 
+    Integration Testing, E2E Testing, TDD, BDD, Observability, Monitoring, Logging, Tracing, Security Best Practices,
+    5+ YOE, 0-4 YOE, Computer Science degree, Algorithm Development, Research, Reporting]
 **Benefits Keywords:** [
-    "Health Insurance", "Dental Insurance", "Vision Insurance", "Mental Health Support", 
-    "Gym Card", "Wellness Programs", "Training Programs", "Certifications", 
-    "Conferences", "Online Learning", "Flexible Hours", "Remote Work", "Hybrid Work", 
-    "Generous PTO", "Parental Leave", "Competitive Salary", "Bonuses", "Stock Options", 
-    "Pension Matching", "Relocation Assistance", "Career Progression", "Mentorship", 
-    "Leadership Training", "Inclusive Culture", "Modern Office", "Hackathons", 
-    "Free Snacks", "Company Events", "Tech Discounts", "Transportation Benefits", 
-    "Pet-Friendly Workplace", "Casual Atmosphere"]
+    Competitive Salary, Bonuses, Stock Options, Retirement Plan, Health Insurance, Employee Assistance Program, 
+    Gym Membership, Wellness Programs, Flexible Hours, Remote Work, Hybrid Work, Generous PTO (Paid Time Off), 
+    Parental Leave, Training Programs, Certifications, Career Progression, Mentorship, Leadership Training,
+    Inclusive Culture, Modern Office, Casual Atmosphere, Hackathons, Free Snacks / Catered Meals, Company Events, 
+    Tech Discounts, Commuter Benefits, Relocation Assistance]
 
-Example Input: "Requireements: Seeking engineer with 6+ years ETL experience, AWS cloud expertise, and Kafka streaming knowledge. Offers remote work and stock options."
-Example Output: ETL, AWS, Kafka, 5+ YOE, Remote Work, Stock Options
+**Example Input:** "Requireements: Seeking engineer with 6+ years ETL experience, AWS cloud expertise, and Kafka streaming knowledge. Offers remote work and stock options."
+**Example Output:** ETL, AWS, Kafka, 5+ YOE, Remote Work, Stock Options
 """
 
 SECTION_DEFS = {
     'responsibilities': {
-        'responsibilities', 'duties', 'tasks', 'key responsibilities' },
+        'responsibilities', 'duties', 'tasks', 'key responsibilities', 'as a', 'you will','role',},
     'requirements': {
-        'requirements', 'qualifications', 'skills', 'education', 'experience' },
+        'requirements', 'qualifications', 'skills', 'education', 'experience,' 'we are looking for', 'poszukujemy'},
     'benefits': {
-        'benefits', 'what we offer', 'perks', 'compensation' }
+        'benefits', 'what we offer', 'perks', 'compensation', 'offers', 'oferujemy', 'benefity'}
 }
 
 JSEARCH_QUERY = {

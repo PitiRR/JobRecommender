@@ -1,15 +1,12 @@
 import json
 import logging
 import os
+from typing import Optional
 
-import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
-import openai
-from openai import OpenAI
 
-from src.constants import SYSTEM_MESSAGE, TimePeriod
-from src.utils.transform_utils import extract_sections
+from src.constants import TimePeriod
+from src.utils.transform_utils import ai_summarize_list, extract_sections, RateLimitedStandardizer
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +15,70 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop_duplicates(subset=['url'])
     df = df.dropna(subset=['title', 'company','url'])
     df = remove_empty_lists(df)
-    # for idx, row in df.iterrows():
-    #     features = extract_features_from_desc(row)
-    #     df.at[idx, 'requirements'] = features[0]
-    #     df.at[idx, 'responsibilities'] = features[1]
-    #     df.at[idx, 'benefits'] = features[2]
+    df = transform_missing_features(df)
+    df = standardize_features(df)
 
-    # for idx, row in df.iterrows():
-    #     if row[['requirements', 'responsibilities', 'benefits']].isna().any():
-    #         logger.warning(f"Row {idx} is missing requirements, responsibilities, or benefits")
-    #         features = extract_features_from_desc(row)
-    #         df.at[idx, 'requirements'] = features[0]
-    #         df.at[idx, 'responsibilities'] = features[1]
-    #         df.at[idx, 'benefits'] = features[2]
     return df
 
-def extract_features_from_desc(row: pd.Series) -> list:
+def standardize_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Standardize the responsibilities, requirements and benefits in the DataFrame
+    by applying my_func to each relevant cell.
+    """
+    df = df.copy()
+    features = ['requirements', 'responsibilities', 'benefits']
+    standardizer = RateLimitedStandardizer(rpm=15)
+    for feature in features:
+        if feature in df.columns:
+            logger.info(f"--- Standardizing column: {feature} ---")
+            df[feature] = df[feature].apply(
+                lambda value: standardizer.process_value(value, feature)
+            )
+            logger.info(f"--- Finished standardizing column: {feature} ---")
+        else:
+            logger.warning(f"Column '{feature}' not found.")
+
+    return df
+
+def transform_missing_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Transform DataFrame by filling missing requirements, responsibilities, and benefits
+    from the description field where missing using extract_features_from_desc.
+
+    
+    Args:
+        df: Input DataFrame with job posting data
+        
+    Returns:
+        DataFrame with filled missing values
+    """
+    df = df.copy()
+    
+    missing_mask = df[['requirements', 'responsibilities', 'benefits']].isna().any(axis=1)
+    rows_to_process = df[missing_mask]
+    
+    if rows_to_process.empty:
+        return df
+        
+    for idx in rows_to_process.index:
+        try:
+            logger.warning(f"Row {idx} is missing requirements, responsibilities, or benefits")
+            features = extract_features_from_desc(rows_to_process.loc[idx])
+            
+            if pd.isna(df.at[idx, 'requirements']):
+                df.at[idx, 'requirements'] = features[0]
+            if pd.isna(df.at[idx, 'responsibilities']):
+                df.at[idx, 'responsibilities'] = features[1]
+            if pd.isna(df.at[idx, 'benefits']):
+                df.at[idx, 'benefits'] = features[2]
+                
+        except Exception as e:
+            logger.error(f"Error processing row {idx}: {str(e)}")
+            continue
+            
+    return df
+
+def extract_features_from_desc(row: pd.Series) -> Optional[list]:
     """
         This function verifies that responsibilities, requirements, and benefits fields are empty.
         If they are, attempt to extract the missing data from the description. 
@@ -53,7 +98,8 @@ def extract_features_from_desc(row: pd.Series) -> list:
         if features:
             print(f'row {row.name}, Responsibilities: {features}')
             try:
-                requirements = ai_summarize_list(f'requirements {", ".join(features)}').split(',')
+                result = ai_summarize_list(f'requirements {", ".join(features)}')
+                requirements = result.split(',') if result else []
             except Exception as e:
                 logger.error(f"Error summarizing responsibilities: {e}")
                 requirements = []
@@ -65,7 +111,8 @@ def extract_features_from_desc(row: pd.Series) -> list:
         if features:
             print(f'row {row.name}, Reqs: {features}')
             try:
-                responsibilities = ai_summarize_list(f'requirements {", ".join(features)}').split(',')
+                result = ai_summarize_list(f'requirements {", ".join(features)}')
+                responsibilities = result.split(',') if result else []
             except Exception as e:
                 logger.error(f"Error summarizing requirements: {e}")
                 responsibilities = []
@@ -77,78 +124,14 @@ def extract_features_from_desc(row: pd.Series) -> list:
         if features:
             print(f'row {row.name}, Benefits: {features}')
             try:
-                benefits = ai_summarize_list(f'benefits {", ".join(features)}').split(',')
+                result = ai_summarize_list(f'benefits {", ".join(features)}')
+                benefits = result.split(',') if result else []
             except Exception as e:
                 logger.error(f"Error summarizing benefits: {e}")
                 benefits = []
             print(f'row {row.name}, Benefits summarized: {benefits}')
 
     return [requirements, responsibilities, benefits]
-
-def ai_summarize_list(prompt: str) -> str:
-    """
-    Summarizes a list of job posting items into keywords using LLM.
-    Some job postings do not have the relevant sections, and details are found in the description.
-    This function accepts a string of responsibilities, requirements, or benefits.
-    The keywords are predefined and categorized into requirements/responsibilities and benefits. 
-    The function uses an AI model defined in model_name to generate the summary.
-    See constants.py for the system instructions.
-    Args:
-        query (str): String with raw items. This may be any of the 3 categories.
-    Returns:
-        list: A list of keywords summarizing the input list.
-    Raises:
-        ValueError: If the input list is empty or not a list.
-        Exception: If there is an error in the AI model response.
-    Example:
-        input_list = [
-            "Experience with ETL processes",
-            "Knowledge of data warehousing",
-            "Health insurance benefits" 
-        ]
-        summarized_list = ai_summarize_list(input_list)
-        # Output: ['ETL', 'Data Warehousing', 'Health Insurance']
-    """
-    load_dotenv()
-    token = os.getenv('GITHUB_TOKEN')
-    endpoint = "https://models.inference.ai.azure.com"
-    model_name = "gpt-4o"
-    client = OpenAI(
-        base_url=endpoint,
-        api_key=token,
-    )
-
-    try:
-        response = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_MESSAGE,
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            temperature=0.5,
-            top_p=1.0,
-            max_tokens=1000,
-            model=model_name
-        )
-        return response.choices[0].message.content
-    except openai.APIError as e:
-        #Handle API error here, e.g. retry or log
-        print(f"OpenAI API returned an API Error: {e}")
-        pass
-    except openai.APIConnectionError as e:
-        #Handle connection error here
-        print(f"Failed to connect to OpenAI API: {e}")
-        pass
-    except openai.RateLimitError as e:
-        #Handle rate limit error (we recommend using exponential backoff)
-        print(f"OpenAI API request exceeded rate limit: {e}")
-        pass
-    return e
 
 def standardize_compensation(compensation: dict, period: TimePeriod) -> list[int]:
     """

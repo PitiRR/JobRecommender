@@ -115,7 +115,7 @@ def extract_from_pracuj() -> list:
             job_url = job.a.get('href').split('?')[0]
             job_title = job.find('h2', {'data-test':'offer-title'}).text.strip()
 
-            job_seniority_level = job_contracts = job_office_mode = None
+            job_seniority_level = job_contracts = job_office_mode = job_desc = None
             job_time_schedule = job_responsibilities = job_requirements = job_benefits = None
             job_salary_range = [None, None]
             
