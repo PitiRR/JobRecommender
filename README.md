@@ -1,33 +1,32 @@
 # JobRecommender
 
-End-to-end data ETL pipeline that extracts available jobs, and recommends best-fitting ones with a recommender System
+End-to-end data ETL pipeline that extracts available jobs, and recommends best-fitting ones with a Linear Regression scoring system.
 
-Status: WIP
+Status: WIP - collecting data for training
 
 ## About
 
 ### Scope and impact
 
-JobRecommender is a job aggreggator that extracts postings from online boards using an ETL pipeline, stores the data in Clickhouse data warehouse, where you can perform analytics. Find most fitting and personalized job offers ranked using an ML content-based Recommender System algorithm. 
+JobRecommender is a job aggreggator that extracts postings from online boards using Selenium, transforms the data with custom logic facilitated by Pandas, stores the data in Postgresql - in one word, an ETL pipeline.
 
-This project runs on-prem with Docker.
+Find most fitting and personalized job offers ranked using ML!
+
+This project runs with Docker.
 
 ### Deliverables
 
-- Onprem (Docker).
+- Runs on Docker.
 - Batch ingestion (daily) ETL pipeline.
 - Database to retain historical data.
 - Machine learning model for recommendations.
-- Dashboards for insights.
 - Tech Stack:
   - Terraform and Docker for infra and deployment,
-  - Python 3.9,
+  - Python 3.*,
   - pandas for transformation and cleaning,
   - Airflow for orchestration,
   - Postgresql for data storage,
-  - dbt for downstream in-place transformations,
-  - Numpy, Scikit-learn, Tensorflow for ML
-  - Apache Superset.
+  - Numpy, Scikit-learn, or Tensorflow for ML
 
 ## Getting Started
 
